@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <sys/ioctl.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 // https://www.kernel.org/doc/Documentation/hid/hidraw.txt
@@ -16,6 +17,7 @@ static bool running = true;
 
 void stop_running(int sig)
 {
+    (void)sig;
     running = false;
 }
 
@@ -25,7 +27,7 @@ int main(void)
 {
     {
         struct sigaction act = {
-            .sa_handler = stop_running;
+            .sa_handler = stop_running,
         };
         sigaction(SIGINT, &act, NULL);
         sigaction(SIGKILL, &act, NULL);
@@ -35,8 +37,8 @@ int main(void)
     // NOTE: Included udev rules create this symlink to the appropriate hidraw
     // entry.
     const char *hid_file_path         = "/dev/co2mini0";
-    const char *temperature_file_path = "/tmp/co2mini_temp";
-    const char *co2_file_path         = "/tmp/co2mini_co2";
+    const char *temperature_file_path = "/tmp/co2minimon_temp";
+    const char *co2_file_path         = "/tmp/co2minimon_co2";
 
     int device_handle = -1;
 
