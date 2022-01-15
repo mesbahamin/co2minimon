@@ -24,8 +24,9 @@ void stop_running(int sig)
 int main(void)
 {
     {
-        struct sigaction act = {0};
-        act.sa_handler = stop_running;
+        struct sigaction act = {
+            .sa_handler = stop_running;
+        };
         sigaction(SIGINT, &act, NULL);
         sigaction(SIGKILL, &act, NULL);
         sigaction(SIGTERM, &act, NULL);
@@ -33,28 +34,46 @@ int main(void)
 
     // NOTE: Included udev rules create this symlink to the appropriate hidraw
     // entry.
-    int device_handle = open("/dev/co2mini0", O_RDWR);
-    if (device_handle < 0)
-    {
-        printf("ERROR: Failed to open HID.\n");
-        return 1;
-    }
-
-    {
-        uint8_t key[8] = {0};
-        int result = ioctl(device_handle, HIDIOCSFEATURE(sizeof(key)), key);
-        if (result < 0 || result != sizeof(key))
-        {
-            printf("ERROR: Failed to send feature report.\n");
-            return 1;
-        }
-    }
-
+    const char *hid_file_path         = "/dev/co2mini0";
     const char *temperature_file_path = "/tmp/co2mini_temp";
     const char *co2_file_path         = "/tmp/co2mini_co2";
 
+    int device_handle = -1;
+
     while (running)
     {
+        if (access(hid_file_path, F_OK) != 0)
+        {
+            if (close(device_handle) == 0)
+            {
+                device_handle = -1;
+            }
+
+            unlink(co2_file_path);
+            unlink(temperature_file_path);
+
+            sleep(30);
+            continue;
+        }
+
+        if (device_handle == -1)
+        {
+            device_handle = open(hid_file_path, O_RDWR);
+            if (device_handle < 0)
+            {
+                printf("ERROR: Failed to open HID.\n");
+                return 1;
+            }
+
+            uint8_t key[8] = {0};
+            int result = ioctl(device_handle, HIDIOCSFEATURE(sizeof(key)), key);
+            if (result < 0 || result != sizeof(key))
+            {
+                printf("ERROR: Failed to send feature report.\n");
+                return 1;
+            }
+        }
+
         uint8_t data[8] = {0};
         int bytes_read = read(device_handle, &data, sizeof(data));
         if (bytes_read < 0 && (errno == EAGAIN || errno == EINPROGRESS))
