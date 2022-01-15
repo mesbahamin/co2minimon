@@ -92,9 +92,8 @@ int main(void)
         if (bytes_read == sizeof(data)
             && end == 0x0d
             && (item == 0x42 || item == 0x50)
-            && item + msb + lsb == checksum)
+            && ((item + msb + lsb) & 0xFF) == checksum)
         {
-
             uint16_t value = (((uint16_t)msb) << 8) | lsb;
             char buf[1024] = {0};
             int str_len = 0;
