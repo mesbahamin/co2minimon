@@ -41,9 +41,11 @@ int main(void)
     const char *co2_file_path         = "/tmp/co2minimon_co2";
 
     int device_handle = -1;
+    int again_count = 0;
 
     while (running)
     {
+
         if (access(hid_file_path, F_OK) != 0)
         {
             if (close(device_handle) == 0)
@@ -67,6 +69,13 @@ int main(void)
                 return 1;
             }
 
+            // TODO: do a timed out blocking read with select(), or if not
+            // possible, at least sleep(5) at the end of the loop.
+            int flags = fcntl(device_handle, F_GETFL);
+            flags |= O_NONBLOCK;
+            fcntl(device_handle, F_SETFL, flags);
+
+            // TODO: Try with just a 0
             uint8_t key[8] = {0};
             int result = ioctl(device_handle, HIDIOCSFEATURE(sizeof(key)), key);
             if (result < 0 || result != sizeof(key))
@@ -78,10 +87,40 @@ int main(void)
 
         uint8_t data[8] = {0};
         int bytes_read = read(device_handle, &data, sizeof(data));
-        if (bytes_read < 0 && (errno == EAGAIN || errno == EINPROGRESS))
+        // TODO: handle bytes_read == 0 aka eof aka pipe closed for writing
+        if (bytes_read < 0)
         {
-            bytes_read = 0;
+            if ((errno == EAGAIN || errno == EWOULDBLOCK))
+            {
+                again_count++;
+                if (again_count > 10000000) {
+                    // If we go too long with an empty pipe, the device may
+                    // have stopped sending data. Resend the feature report to
+                    // get it to send data again. A situation where I've
+                    // observed this happening is when I hibernate and resume
+                    // the computer. Upon resumption, all calls to read() will
+                    // block until we resend the feature report.
+                    //
+                    // I'm not sure why this happens, but my guess would be
+                    // that the device stops sending new data if the data
+                    // hasn't been read in a while.
+                    uint8_t key[8] = {0};
+                    int result = ioctl(device_handle, HIDIOCSFEATURE(sizeof(key)), key);
+                    if (result < 0 || result != sizeof(key))
+                    {
+                        printf("ERROR: Failed to send feature report.\n");
+                        return 1;
+                    }
+                }
+                continue;
+            } else {
+                // TODO: handle error
+                printf("Unhandled error: %i\n", errno);
+            }
         }
+        again_count = 0;
+
+        //printf("bytes_read: %d\n", bytes_read);
 
         uint8_t item     = data[0];
         uint8_t msb      = data[1];
@@ -94,6 +133,7 @@ int main(void)
             && (item == 0x42 || item == 0x50)
             && ((item + msb + lsb) & 0xFF) == checksum)
         {
+            printf("write\n");
             uint16_t value = (((uint16_t)msb) << 8) | lsb;
             char buf[1024] = {0};
             int str_len = 0;
@@ -104,6 +144,7 @@ int main(void)
             {
                 case 0x42:
                 {
+                    printf("bytes T\n");
                     double t_celsius = value / 16.0 - 273.15;
                     str_len = snprintf(buf, sizeof(buf), "%.2f", t_celsius);
                     assert(str_len > 0);
@@ -118,6 +159,7 @@ int main(void)
 
                 case 0x50:
                 {
+                    printf("bytes C\n");
                     str_len = snprintf(buf, sizeof(buf), "%d", value);
                     assert(str_len > 0);
                     int f = open(co2_file_path, open_mode, create_mode);
