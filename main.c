@@ -7,17 +7,22 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <sys/ioctl.h>
+#include <sys/select.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
+// TODO: Use syslog.h for logging
+// TODO: Make a systemd unit for this
+// TODO: cleanup on error
 
 // https://www.kernel.org/doc/Documentation/hid/hidraw.txt
 #include <linux/hidraw.h>
 
-static bool running = true;
+volatile static bool running = true;
 
-void stop_running(int sig)
+static void stop_running(int signal)
 {
-    (void)sig;
+    (void)signal;
     running = false;
 }
 
@@ -41,13 +46,18 @@ int main(void)
     const char *co2_file_path         = "/tmp/co2minimon_co2";
 
     int device_handle = -1;
-    int again_count = 0;
 
     while (running)
     {
-
         if (access(hid_file_path, F_OK) != 0)
         {
+            {
+                fd_set read_fds;
+                FD_ZERO(&read_fds);
+                FD_SET(device_handle, &read_fds);
+                int ready = select(device_handle + 1, &read_fds, NULL, NULL, &(struct timeval){ .tv_sec = 15 });
+                assert(ready != -1);
+            }
             if (close(device_handle) == 0)
             {
                 device_handle = -1;
@@ -56,7 +66,7 @@ int main(void)
             unlink(co2_file_path);
             unlink(temperature_file_path);
 
-            sleep(30);
+            sleep(5);
             continue;
         }
 
@@ -69,12 +79,6 @@ int main(void)
                 return 1;
             }
 
-            // TODO: do a timed out blocking read with select(), or if not
-            // possible, at least sleep(5) at the end of the loop.
-            int flags = fcntl(device_handle, F_GETFL);
-            flags |= O_NONBLOCK;
-            fcntl(device_handle, F_SETFL, flags);
-
             // TODO: Try with just a 0
             uint8_t key[8] = {0};
             int result = ioctl(device_handle, HIDIOCSFEATURE(sizeof(key)), key);
@@ -85,42 +89,42 @@ int main(void)
             }
         }
 
+        fd_set read_fds;
+        FD_ZERO(&read_fds);
+        FD_SET(device_handle, &read_fds);
+        errno = 0;
+        int ready = select(device_handle + 1, &read_fds, NULL, NULL, &(struct timeval){ .tv_sec = 15 });
+        int bytes_read = 0;
         uint8_t data[8] = {0};
-        int bytes_read = read(device_handle, &data, sizeof(data));
-        // TODO: handle bytes_read == 0 aka eof aka pipe closed for writing
-        if (bytes_read < 0)
+        if (ready == -1 && errno != EINTR)
         {
-            if ((errno == EAGAIN || errno == EWOULDBLOCK))
+            assert(false);
+            break;
+        }
+        else if (ready == 0)
+        {
+            // If we go too long with an empty pipe, the device may
+            // have stopped sending data. Resend the feature report to
+            // get it to send data again. A situation where I've
+            // observed this happening is when I hibernate and resume
+            // the computer. Upon resumption, all calls to read() will
+            // block until we resend the feature report.
+            //
+            // I'm not sure why this happens, but my guess would be
+            // that the device stops sending new data if the data
+            // hasn't been read in a while.
+            uint8_t key[8] = {0};
+            int result = ioctl(device_handle, HIDIOCSFEATURE(sizeof(key)), key);
+            if (result < 0 || result != sizeof(key))
             {
-                again_count++;
-                if (again_count > 10000000) {
-                    // If we go too long with an empty pipe, the device may
-                    // have stopped sending data. Resend the feature report to
-                    // get it to send data again. A situation where I've
-                    // observed this happening is when I hibernate and resume
-                    // the computer. Upon resumption, all calls to read() will
-                    // block until we resend the feature report.
-                    //
-                    // I'm not sure why this happens, but my guess would be
-                    // that the device stops sending new data if the data
-                    // hasn't been read in a while.
-                    uint8_t key[8] = {0};
-                    int result = ioctl(device_handle, HIDIOCSFEATURE(sizeof(key)), key);
-                    if (result < 0 || result != sizeof(key))
-                    {
-                        printf("ERROR: Failed to send feature report.\n");
-                        return 1;
-                    }
-                }
-                continue;
-            } else {
-                // TODO: handle error
-                printf("Unhandled error: %i\n", errno);
+                printf("ERROR: Failed to send feature report.\n");
+                return 1;
             }
         }
-        again_count = 0;
-
-        //printf("bytes_read: %d\n", bytes_read);
+        else
+        {
+            bytes_read = read(device_handle, &data, sizeof(data));
+        }
 
         uint8_t item     = data[0];
         uint8_t msb      = data[1];
