@@ -106,7 +106,7 @@ Device Status:     0x0000
   (Bus Powered)
 ```
 
-[1]: https://www.co2meter.com/products/co2mini-co2-indoor-air-quality-monitor
+[1]: https://web.archive.org/web/20220522013217/https://www.co2meter.com/products/co2mini-co2-indoor-air-quality-monitor
 [2]: https://i3wm.org/i3status/
-[3]: https://hackaday.io/project/5301/logs?sort=oldest
-[4]: http://co2meters.com/Documentation/Other/AN_RAD_0301_USB_Communications_Revised8.pdf
+[3]: https://web.archive.org/web/20220522013203/https://hackaday.io/project/5301/logs?sort=oldest
+[4]: https://web.archive.org/web/20220501135432/http://co2meters.com/Documentation/Other/AN_RAD_0301_USB_Communications_Revised8.pdf
