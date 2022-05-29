@@ -53,7 +53,6 @@ int main(void)
     bool error_occurred = false;
     int device_handle = -1;
     bool need_send_feature_report = true;
-    fd_set read_fds;
 
     while (running)
     {
@@ -80,8 +79,6 @@ int main(void)
                 goto error;
             }
 
-            FD_ZERO(&read_fds);
-            FD_SET(device_handle, &read_fds);
             need_send_feature_report = true;
         }
 
@@ -96,6 +93,9 @@ int main(void)
             need_send_feature_report = false;
         }
 
+        fd_set read_fds;
+        FD_ZERO(&read_fds);
+        FD_SET(device_handle, &read_fds);
         errno = 0;
         int ready = select(device_handle + 1, &read_fds, NULL, NULL, &(struct timeval){ .tv_sec = 15 });
         if (ready == -1 && errno != EINTR)
