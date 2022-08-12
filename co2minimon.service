@@ -1,0 +1,9 @@
+[Unit]
+Description=CO2Mini Monitor Daemon
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/co2minimon
+
+[Install]
+WantedBy=default.target

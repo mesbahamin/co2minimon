@@ -12,7 +12,6 @@
 #include <unistd.h>
 
 // TODO: Use syslog.h for logging
-// TODO: Make a systemd unit for this
 
 // https://www.kernel.org/doc/Documentation/hid/hidraw.txt
 #include <linux/hidraw.h>
