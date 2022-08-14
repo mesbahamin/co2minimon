@@ -89,7 +89,6 @@ int main(void)
 
     while (running)
     {
-        print_state(state);
         switch (state)
         {
             case DEVICE_HANDLE_INACCESSIBLE:
@@ -234,7 +233,6 @@ int main(void)
                                     printf("ERROR: Failed to open output file for temperature.\n");
                                     state = FATAL_ERROR;
                                 }
-                                printf("write T\n");
                                 write(f, buf, str_len);
                                 close(f);
                             } break;
@@ -249,7 +247,6 @@ int main(void)
                                     printf("ERROR: Failed to open output file for CO2.\n");
                                     state = FATAL_ERROR;
                                 }
-                                printf("write CO2\n");
                                 write(f, buf, str_len);
                                 close(f);
                             } break;

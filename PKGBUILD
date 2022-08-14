@@ -16,7 +16,7 @@ source=(build.sh
         ${pkgname}.service)
 # update with updpkgsums from pacman-contrib
 sha256sums=('760c19a24dce4341650857d28f3f6e6f7fe788428c9658ff9082d01c6afaec72'
-            '68532958d2b33a063ce0c61901f5e9515cbee830838bcde2ff143c23c2aadc08'
+            '07b2e03e16c38b2e98c0c0f293196d8a168cc5189d72fed2bf4859cc9d0e903f'
             '7e12e5df4bae12cb21581ba157ced20e1986a0508dd10d0e8a4ab9a4cf94e85c'
             '2d6b333afdf16af84232032040703c054b5529a79d4bea4e65831fd50b05635a')
 
